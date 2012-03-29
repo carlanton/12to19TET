@@ -7,17 +7,18 @@
 
 Gain output => JCRev reverb => dac;
 0.2 => output.gain; 
-0.03 => reverb.mix;
+0.01 => reverb.mix;
 
-20::ms => dur release_time;
+10::ms => dur release_time;
 
+[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map[];
 
 144 => int NOTE_ON;
 128 => int NOTE_OFF;
 
 int notes[128];
 
-false => int mode19;
+true => int mode19;
 0 => int midi_port;
 
 MidiIn midi_in;
@@ -35,7 +36,7 @@ MidiMsg midi_msg;
 
 while (true) {
 	midi_in => now;
-	
+
 	while (midi_in.recv(midi_msg)) {
 		midi_msg.data1 => int action;
 		midi_msg.data2 => int note;
@@ -72,33 +73,37 @@ fun void keyEvent() {
 	}
 }
 
-
-
-fun float f(int n) {
+fun float freq(int note) {
 	float freq;
 
 	if (!mode19) {
-		Std.mtof(n) => freq;
+		Std.mtof(note) => freq;
 	} else {
+		note / 12 => int octave;
+		map[note % 12] => int n;
 
-		[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map[];
-		n / 12 => int octave;
-		map[n % 12] => n;
-
-		// 2^(1/19) = 1.03715504
-		Math.pow(2.0,octave - 3) * 65.4064 * Math.pow(1.03715504, n) => freq;
+		Std.mtof(0) * Math.pow(2, octave + n/19.0) => freq;
 	}
+
+	if (mode19)
+		<<< 1200 * Math.log2(Std.mtof(note) / freq) + " cent" >>>;
 
 	return freq;
 }
 
 fun void voice(int note, int velocity) {
-	TriOsc voc => ADSR e => output; 
-	velocity / 128.0 => voc.gain;
-	f(note) => voc.freq;
+	SinOsc voc => ADSR e => output; 
+	
+	e.set(
+		5::ms, // Attack time
+		5::ms, // Decay time	
+		.5,    // Sustain rate
+		release_time); // Release time
 
-	e.sustainLevel(.7);
-	e.releaseTime(release_time);
+	velocity / 128.0 => voc.gain;
+	freq(note) => voc.freq;
+
+	e.keyOn();
 	
 	while (notes[note]) {
 		midi_in => now;
