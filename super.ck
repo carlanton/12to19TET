@@ -11,7 +11,8 @@ Gain output => JCRev reverb => dac;
 
 10::ms => dur release_time;
 
-[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map[];
+//[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map[];
+[0,1,3,4,6,8,9,11,12,14,16,17] @=> int map[];
 
 144 => int NOTE_ON;
 128 => int NOTE_OFF;
@@ -92,7 +93,7 @@ fun float freq(int note) {
 }
 
 fun void voice(int note, int velocity) {
-	SinOsc voc => ADSR e => output; 
+	TriOsc voc => ADSR e => output; 
 	
 	e.set(
 		5::ms, // Attack time
