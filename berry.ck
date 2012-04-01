@@ -1,27 +1,37 @@
-/**
-	TODO:
-	
-	* Möjlighet att välja tonart!
-
-*/
-
 Gain output => dac;
 0.5 => output.gain; 
 
-10::ms => dur release_time;
+20::ms => dur release_time;
 
-//[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map[];
-[0,1,3,4,6,8,9,11,12,14,16,17] @=> int map[];
+//[0,2,3,5,6,8,9,11,13,14,16,17] @=> int map12[]; 
+[0,1,3,4,6,8,9,11,12,14,16,17] @=> int map[]; // Mellandom
+//[0,-1,3,-1,6,8,-1,11,-1,14,-1,17] @=> int map[];
 
 144 => int NOTE_ON;
 128 => int NOTE_OFF;
+192 => int PROGRAM;
 
+
+// 128 = 2^6
+// Todo gör om detta till 1 int (eller något som är 8bitar)
 int notes[128];
 
-true => int mode19;
-0 => int transpose;
+["C"
+,"Db"
+,"D"
+,"Eb"
+,"E"
+,"F"
+,"Gb"
+,"G"
+,"Ab"
+,"A"
+,"Bb"
+,"B"] @=> string key_names[];
 
+0 => int key;
 
+// Midi grejer
 0 => int midi_port;
 
 MidiIn midi_in;
@@ -32,36 +42,7 @@ if (!midi_in.open(midi_port)) {
 }
 
 spork ~ keyEvent();
-
--1 => int status;
--1 => int round;
-
-[0,0,1,1,0] @=> int startModes[];
-
-[0,8,5,-2,8] @=> int trans[];
-
-
-fun void mode() {
-	status++;
-	if (status % 8 == 0) {
-		round++;
-		startModes[round] => mode19;
-		trans[round] => transpose;
-
-		<<< "New round:", round, "Start mode:", mode19, "Transpose:", transpose >>>;
-
-
-	} else 	if (status % 4 == 0) {
-		!mode19 => mode19;
-
-		<<< "Mode:", mode19 >>>;
-	}
-}
-
-
-
 MidiMsg midi_msg;
-
 
 while (true) {
 	midi_in => now;
@@ -71,9 +52,19 @@ while (true) {
 		midi_msg.data2 => int note;
 		midi_msg.data3 => int velocity;
 
-		if (action == NOTE_ON) {
-			mode();
+		if (action == PROGRAM) {
+			note => key;
 
+			if (key < 12) {
+				<<< "Using 19TET with key", key_names[key] >>>;
+			} else {
+				<<< "Using 12TET" >>>;
+			}
+		}
+
+
+		if (action == NOTE_ON) {
+			<<< key_names[note % 12] >>>;
 			//Send pitch and velocity information
 			if (!notes[note]) 
 				spork ~ voice(note, velocity);
@@ -98,12 +89,9 @@ fun void keyEvent() {
 		while (kb.more()) {
 			kb.getchar() => int c;
 			
-			if (c == 32) {
-				!mode19 => mode19;
-				<<< mode19 ? "Mode: 19 TET" : "Mode: 12 TET" >>>;
-				break;
-			} else if (c >= 48 && c <= 57) {
-				c - 48 => transpose;
+			if (c >= 48 && c <= 57) {
+				c - 48 => key;
+				<<< "Using 19TET with key", key >>>;
 			}
 		}
 	}
@@ -112,17 +100,24 @@ fun void keyEvent() {
 fun float freq(int note) {
 	float freq;
 
-	if (!mode19) {
-		Std.mtof(note + transpose) => freq;
+	if (key == 12) {
+		Std.mtof(note) => freq;
 	} else {
+		
+		note - key => note;
+
+		if (map[note % 12] == -1) {
+			<<< "undef tone", (note%12), "in key", key >>>;
+			return 0.0;
+		}
+
 		note / 12 => int octave;
 		map[note % 12] => int n;
 
-		Std.mtof(transpose) * Math.pow(2, octave + n/19.0) => freq;
+
+		Std.mtof(key) * Math.pow(2, octave + n/19.0) => freq;
 	}
 
-//	if (mode19)
-//		<<< 1200 * Math.log2(Std.mtof(note) / freq) + " cent" >>>;
 	return freq;
 }
 
