@@ -98,7 +98,7 @@ while (true) {
 		} else if (action == NOTE_OFF) {
 
 			if (us[note] != null)
-				us[note].signal();
+				us[note].broadcast();
 
 		}
 	}
@@ -147,19 +147,16 @@ fun void voice() {
 
 		on.velocity / 128.0 => voc.gain;
 		freq(note) => voc.freq;
-
-		if (us[note] != null) {
-			us[note].signal();
-		}
-
-		1::samp => now;
-		
-		off @=> us[note];
-
 		e.keyOn();
 
-		off => now;
-		null @=> us[note];
+		if (us[note] != null) {
+			us[note] => now;
+		} else {
+			off @=> us[note];
+			off => now;
+			null @=> us[note];
+		}
+
 		e.keyOff();
 		release_time => now;
 		e =< output;
